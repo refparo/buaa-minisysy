@@ -52,20 +52,13 @@ static int lex(std::istream & in, std::ostream & out) {
   while (true) {
     if (is_nondigit(in.peek())) {
       switch (in.peek()) {
-        case 'i':
-          return lex_keyword(in, out, "if", "If");
-        case 'e':
-          return lex_keyword(in, out, "else", "Else");
-        case 'w':
-          return lex_keyword(in, out, "while", "While");
-        case 'b':
-          return lex_keyword(in, out, "break", "Break");
-        case 'c':
-          return lex_keyword(in, out, "continue", "Continue");
-        case 'r':
-          return lex_keyword(in, out, "return", "Return");
-        default:
-          return lex_ident(in, out, {char(in.get())});
+      case 'i': return lex_keyword(in, out, "if", "If");
+      case 'e': return lex_keyword(in, out, "else", "Else");
+      case 'w': return lex_keyword(in, out, "while", "While");
+      case 'b': return lex_keyword(in, out, "break", "Break");
+      case 'c': return lex_keyword(in, out, "continue", "Continue");
+      case 'r': return lex_keyword(in, out, "return", "Return");
+      default: return lex_ident(in, out, {char(in.get())});
       }
     }
     if (is_digit(in.peek())) {
@@ -77,66 +70,66 @@ static int lex(std::istream & in, std::ostream & out) {
       return 0;
     }
     switch (in.peek()) {
-      case '=':
-        in.get();
-        if (in.peek() == '=') {
-          out << "Eq" << std::endl;
-          in.get();
-          return 0;
-        } else {
-          out << "Assign" << std::endl;
-          return 0;
-        }
-      case ';':
-        out << "Semicolon" << std::endl;
+    case '=':
+      in.get();
+      if (in.peek() == '=') {
+        out << "Eq" << std::endl;
         in.get();
         return 0;
-      case '(':
-        out << "LPar" << std::endl;
-        in.get();
+      } else {
+        out << "Assign" << std::endl;
         return 0;
-      case ')':
-        out << "RPar" << std::endl;
-        in.get();
-        return 0;
-      case '{':
-        out << "LBrace" << std::endl;
-        in.get();
-        return 0;
-      case '}':
-        out << "RBrace" << std::endl;
-        in.get();
-        return 0;
-      case '+':
-        out << "Plus" << std::endl;
-        in.get();
-        return 0;
-      case '*':
-        out << "Mult" << std::endl;
-        in.get();
-        return 0;
-      case '/':
-        out << "Div" << std::endl;
-        in.get();
-        return 0;
-      case '<':
-        out << "Lt" << std::endl;
-        in.get();
-        return 0;
-      case '>':
-        out << "Gt" << std::endl;
-        in.get();
-        return 0;
-      case ' ':
-      case '\r':
-      case '\n':
-        in.get();
-        return 0;
-      case std::char_traits<char>::eof():
-        return 0;
-      default:
-        out << "Err" << std::endl;
-        return 1;
+      }
+    case ';':
+      out << "Semicolon" << std::endl;
+      in.get();
+      return 0;
+    case '(':
+      out << "LPar" << std::endl;
+      in.get();
+      return 0;
+    case ')':
+      out << "RPar" << std::endl;
+      in.get();
+      return 0;
+    case '{':
+      out << "LBrace" << std::endl;
+      in.get();
+      return 0;
+    case '}':
+      out << "RBrace" << std::endl;
+      in.get();
+      return 0;
+    case '+':
+      out << "Plus" << std::endl;
+      in.get();
+      return 0;
+    case '*':
+      out << "Mult" << std::endl;
+      in.get();
+      return 0;
+    case '/':
+      out << "Div" << std::endl;
+      in.get();
+      return 0;
+    case '<':
+      out << "Lt" << std::endl;
+      in.get();
+      return 0;
+    case '>':
+      out << "Gt" << std::endl;
+      in.get();
+      return 0;
+    case ' ':
+    case '\r':
+    case '\n':
+      in.get();
+      return 0;
+    case std::char_traits<char>::eof():
+      return 0;
+    default:
+      out << "Err" << std::endl;
+      return 1;
     }
   }
 }
