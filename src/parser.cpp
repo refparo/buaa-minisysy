@@ -49,7 +49,7 @@ Stmt Parser::parse_stmt() {
   // ;
   tok = lexer.get();
   if (tok.tag != Token::SEMICOLON) throw "expected ';'";
-  return Stmt{Return{std::move(retval)}};
+  return Return{std::move(retval)};
 }
 
 // for binary op, returns precedence; for others, returns 0
@@ -60,7 +60,7 @@ static constexpr int prec(Token::Tag op) {
   case Token::MULT: return 2;
   case Token::DIV: return 2;
   case Token::MOD: return 2;
-  default: return -1;
+  default: return 0;
   }
 }
 
@@ -77,14 +77,14 @@ static constexpr Binary::Op tok_to_binary(Token::Tag op) {
 
 Expr Parser::parse_expr(int prev_prec) {
   Expr lhs = parse_unary_expr();
-  while (prec(lexer.peek().tag) >= prev_prec) {
+  while (prec(lexer.peek().tag) > prev_prec) {
     Token tok = lexer.get();
     Expr rhs = parse_expr(prec(tok.tag));
-    lhs = Expr{Binary{
+    lhs = Binary{
       tok_to_binary(tok.tag),
       std::make_unique<Expr>(std::move(lhs)),
       std::make_unique<Expr>(std::move(rhs))
-    }};
+    };
   }
   return lhs;
 }
@@ -111,10 +111,10 @@ Expr Parser::parse_unary_expr() {
   }
   Expr expr = parse_par_expr_or_number();
   while (!stack.empty()) {
-    expr = Expr{Unary{
+    expr = Unary{
       tok_to_unary(stack.back().tag),
       std::make_unique<Expr>(std::move(expr))
-    }};
+    };
     stack.pop_back();
   }
   return expr;
@@ -123,7 +123,7 @@ Expr Parser::parse_unary_expr() {
 Expr Parser::parse_par_expr_or_number() {
   Token tok = lexer.get();
   if (tok.tag == Token::NUMBER) {
-    return Expr{tok.number};
+    return tok.number;
   }
   if (tok.tag == Token::LPAR) {
     Expr inner = parse_expr();
