@@ -6,8 +6,7 @@ set(CMAKE_CXX_STANDARD_REQUIRED True)
 
 add_executable(a.out
   src/main.cpp
-  src/vreg_assigner.cpp
-  src/ir_builder.cpp
+  src/codegen.cpp
   src/ir.cpp
   src/parser.cpp
   src/lexer.cpp

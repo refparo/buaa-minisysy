@@ -5,6 +5,8 @@ struct Parser {
   Lexer lexer;
 
   ast::Program parse();
+
+private:
   ast::Func parse_func();
   ast::Block parse_block();
   ast::Stmt parse_stmt();

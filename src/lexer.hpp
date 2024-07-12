@@ -1,8 +1,8 @@
 #include "token.hpp"
 
 struct Lexer {
-  std::istream & in;
 private:
+  std::istream & in;
   bool has_next;
   Token next;
 
