@@ -37,8 +37,12 @@ std::ostream & operator<<(std::ostream & out, const Token & tok) {
   case Token::BREAK: out << "Break"; break;
   case Token::CONTINUE: out << "Continue"; break;
   case Token::RETURN: out << "Return"; break;
+  case Token::CONST: out << "Const"; break;
+  case Token::INT: out << "Int"; break;
+  case Token::VOID: out << "Void"; break;
   case Token::ASSIGN: out << "Assign"; break;
   case Token::SEMICOLON: out << "Semicolon"; break;
+  case Token::COMMA: out << "Comma"; break;
   case Token::LPAR: out << "LPar"; break;
   case Token::RPAR: out << "RPar"; break;
   case Token::LBRACE: out << "LBrace"; break;
@@ -49,8 +53,14 @@ std::ostream & operator<<(std::ostream & out, const Token & tok) {
   case Token::DIV: out << "Div"; break;
   case Token::MOD: out << "Mod"; break;
   case Token::LT: out << "Lt"; break;
+  case Token::LTEQ: out << "LtEq"; break;
   case Token::GT: out << "Gt"; break;
+  case Token::GTEQ: out << "GtEq"; break;
   case Token::EQ: out << "Eq"; break;
+  case Token::NEQ: out << "NEq"; break;
+  case Token::AND: out << "And"; break;
+  case Token::OR: out << "Or"; break;
+  case Token::NOT: out << "Not"; break;
   case Token::COMMENT: out << "Comment"; break;
   case Token::SPACE: out << "Space"; break;
   case Token::ERR: out << "Err"; break;

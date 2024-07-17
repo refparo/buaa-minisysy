@@ -14,6 +14,6 @@ public:
 
 private:
   Token lex_ident(std::string && head);
-  Token lex_keyword(const char * keyword, Token::Tag tok);
+  Token lex_keyword(std::string && head, const char * tail, Token::Tag tok);
   Token lex_incl_space();
 };

@@ -4,13 +4,16 @@ struct Token {
   enum Tag {
     IDENT,
     NUMBER,
-    IF, ELSE, WHILE, BREAK, CONTINUE, RETURN,
+    IF, ELSE, WHILE, BREAK, CONTINUE, RETURN, CONST,
+    INT, VOID,
     ASSIGN,
     SEMICOLON,
+    COMMA,
     LPAR, RPAR,
     LBRACE, RBRACE,
     PLUS, MINUS, MULT, DIV, MOD,
-    LT, GT, EQ,
+    LT, LTEQ, GT, GTEQ, EQ, NEQ,
+    AND, OR, NOT,
     COMMENT,
     SPACE,
     ERR

@@ -28,73 +28,92 @@ Token Lexer::lex_ident(std::string && head) {
       break;
     }
   }
-  return Token{std::move(head)};
+  return std::move(head);
 }
 
-// consume `keyword` and output `token`;
+// consume `tail` and output `token`;
 // if failed, try to consume an identifier instead
-//
-// contract: in.peek() == keyword[0]
-Token Lexer::lex_keyword(const char * keyword, Token::Tag tok) {
-  std::string head{char(in.get())};
-  for (keyword++; *keyword != '\0'; keyword++) {
-    if (in.peek() == *keyword) {
+Token Lexer::lex_keyword(std::string && head, const char * tail, Token::Tag tok) {
+  for (; *tail != '\0'; tail++) {
+    if (in.peek() == *tail) {
       head.push_back(char(in.get()));
     } else {
       return lex_ident(std::move(head));
     }
   }
   // this would prevent "returna" from being parsed as Return\nIdent(a)
-  // if (is_nondigit(in.peek())) {
-  //   return lex_ident(std::move(head));
-  // }
-  return Token{tok};
+  if (is_nondigit(in.peek())) {
+    return lex_ident(std::move(head));
+  }
+  return tok;
 }
 
 // consume any space plus possibly one token; output that token
 Token Lexer::lex_incl_space() {
-  int c = in.peek();
+  int c = in.get();
   if (is_nondigit(c)) {
+    std::string head{char(c)};
     switch (c) {
-    case 'i': return lex_keyword("if", Token::IF);
-    case 'e': return lex_keyword("else", Token::ELSE);
-    case 'w': return lex_keyword("while", Token::WHILE);
-    case 'b': return lex_keyword("break", Token::BREAK);
-    case 'c': return lex_keyword("continue", Token::CONTINUE);
-    case 'r': return lex_keyword("return", Token::RETURN);
-    default: return lex_ident(std::string{char(in.get())});
+    case 'i':
+      c = in.get();
+      head.push_back(c);
+      switch (c) {
+        case 'f': return Token::IF;
+        case 'n': return lex_keyword(std::move(head), "t", Token::INT);
+        default: return lex_ident(std::move(head));
+      }
+    case 'e': return lex_keyword(std::move(head), "lse", Token::ELSE);
+    case 'w': return lex_keyword(std::move(head), "hile", Token::WHILE);
+    case 'b': return lex_keyword(std::move(head), "reak", Token::BREAK);
+    case 'c':
+      c = in.get();
+      head.push_back(c);
+      if (c != 'o') return lex_ident(std::move(head));
+      c = in.get();
+      head.push_back(c);
+      if (c != 'n') return lex_ident(std::move(head));
+      c = in.get();
+      head.push_back(c);
+      switch (c) {
+        case 's': return lex_keyword(std::move(head), "t", Token::CONST);
+        case 't': return lex_keyword(std::move(head), "inue", Token::CONTINUE);
+        default: return lex_ident(std::move(head));
+      }
+    case 'r': return lex_keyword(std::move(head), "eturn", Token::RETURN);
+    case 'v': return lex_keyword(std::move(head), "oid", Token::VOID);
+    default: return lex_ident(std::move(head));
     }
   }
-  in.get();
   if (is_digit(c)) {
     std::string num{char(c)};
     while (is_digit(in.peek())) {
       num.push_back(char(in.get()));
     }
-    return Token{std::stoi(num)};
+    return std::stoi(num);
   }
   if (is_space(c)) {
     while (is_space(in.peek())) {
       in.get();
     }
-    return Token{Token::SPACE};
+    return Token::SPACE;
   }
   switch (c) {
   case '=':
     if (in.peek() == '=') {
       in.get();
-      return Token{Token::EQ};
+      return Token::EQ;
     } else {
-      return Token{Token::ASSIGN};
+      return Token::ASSIGN;
     }
-  case ';': return Token{Token::SEMICOLON};
-  case '(': return Token{Token::LPAR};
-  case ')': return Token{Token::RPAR};
-  case '{': return Token{Token::LBRACE};
-  case '}': return Token{Token::RBRACE};
-  case '+': return Token{Token::PLUS};
-  case '-': return Token{Token::MINUS};
-  case '*': return Token{Token::MULT};
+  case ';': return Token::SEMICOLON;
+  case ',': return Token::COMMA;
+  case '(': return Token::LPAR;
+  case ')': return Token::RPAR;
+  case '{': return Token::LBRACE;
+  case '}': return Token::RBRACE;
+  case '+': return Token::PLUS;
+  case '-': return Token::MINUS;
+  case '*': return Token::MULT;
   case '/':
     if (in.peek() == '/') {
       while (in.good()) {
@@ -104,7 +123,7 @@ Token Lexer::lex_incl_space() {
           break;
         }
       }
-      return Token{Token::COMMENT};
+      return Token::COMMENT;
     } else if (in.peek() == '*') {
       while (in.good()) {
         in.get();
@@ -112,20 +131,51 @@ Token Lexer::lex_incl_space() {
           in.get();
           if (in.peek() == '/') {
             in.get();
-            return Token{Token::COMMENT};
+            return Token::COMMENT;
           }
         }
       }
       // Unterminated /* comment
-      return Token{Token::ERR};
+      return Token::ERR;
     } else {
-      return Token{Token::DIV};
+      return Token::DIV;
     }
-  case '%': return Token{Token::MOD};
-  case '<': return Token{Token::LT};
-  case '>': return Token{Token::GT};
+  case '%': return Token::MOD;
+  case '<':
+    if (in.peek() == '=') {
+      in.get();
+      return Token::LTEQ;
+    } else {
+      return Token::LT;
+    }
+  case '>':
+    if (in.peek() == '=') {
+      in.get();
+      return Token::GTEQ;
+    } else {
+      return Token::GT;
+    }
+  case '!':
+    if (in.peek() == '=') {
+      in.get();
+      return Token::NEQ;
+    } else {
+      return Token::NOT;
+    }
+  case '&':
+    if (in.get() == '&') {
+      return Token::AND;
+    } else {
+      return Token::ERR;
+    }
+  case '|':
+    if (in.get() == '|') {
+      return Token::OR;
+    } else {
+      return Token::ERR;
+    }
   // lexer shouldn't be called when `in` is eof
-  default: return Token{Token::ERR};
+  default: return Token::ERR;
   }
 }
 

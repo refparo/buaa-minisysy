@@ -5,8 +5,8 @@
 
 int main() {
   try {
-    Parser parser{Lexer{std::cin}};
-    ast::Program ast = parser.parse();
+    Lexer lexer{std::cin};
+    auto ast = parse(lexer);
     Codegen codegen;
     codegen.add_program(ast);
     std::cout << std::move(codegen).get();
