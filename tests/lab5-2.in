@@ -1,0 +1,20 @@
+int main() {
+    const int c1 = 10 * 5 / 2;
+    const int c2 = c1 / 2, c3 = c1 * 2;
+    if (c1 > 24) {
+        int c1 = 24;
+        putint(c2 - c1 * c3);
+        putch(10);
+    }
+    {
+        int c2 = c1 / 4;
+        putint(c3 / c2);
+        {
+            int c3 = c1 * 4;
+            putint(c3 / c2);
+        }
+    }
+    putch(10);
+    putint(c3 / c2);
+    return 0;
+}

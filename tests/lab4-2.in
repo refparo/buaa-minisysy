@@ -1,0 +1,17 @@
+int main() {
+    int a, b, c = 1, d;
+    int result;
+    a = 5;
+    b = 5;
+    d = -2;
+    result = 2;
+    if (a + b + c + d == 10) {
+        result = result + 1;
+    } else if (a + b + c + d == 8) {
+        result = result + 2;
+    } else {
+        result = result + 4;
+    }
+    putint(result);
+    return 0;
+}

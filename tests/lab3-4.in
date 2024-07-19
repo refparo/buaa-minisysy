@@ -1,0 +1,5 @@
+int main() {
+    int n = getint();
+    putint(n + 4);
+    return 0;
+}

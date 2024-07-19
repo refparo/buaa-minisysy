@@ -52,10 +52,11 @@ struct FuncCall {
 using Stmt = std::variant<
   // empty statement
   std::monostate,
-  // need not be ended with ';'
+  // may not be ended with ';'
   struct If,
   struct IfElse,
   struct While,
+  struct Block,
   // must be ended with ';'
   struct Assign,
   struct Return,
@@ -71,7 +72,7 @@ struct Assign {
 };
 
 struct Return {
-  Expr retval;
+  std::optional<Expr> retval;
 };
 
 struct Block : std::vector<Stmt> {};

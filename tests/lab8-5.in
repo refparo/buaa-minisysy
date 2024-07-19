@@ -1,0 +1,11 @@
+int foo(int a, int b) {
+    int t = a + b;
+    a = t - a;
+    b = t - b;
+    return a - b;
+}
+
+int main() {
+    putint(foo(1, 2, 3));
+    return 0;
+}

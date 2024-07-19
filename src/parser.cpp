@@ -32,8 +32,12 @@ Program parse(Lexer & lexer) {
 Global parse_global(Lexer & lexer) {
   switch (lexer.peek().tag) {
   case Token::CONST:
+  {
     lexer.get();
-    return parse_var_decl(lexer, true);
+    VarDecl result = parse_var_decl(lexer, true);
+    if (lexer.get().tag != Token::SEMICOLON) throw "expected ';'";
+    return result;
+  }
   default:
     Type type = parse_type(lexer);
     Ident name = lexer.get().ident;
@@ -42,7 +46,9 @@ Global parse_global(Lexer & lexer) {
     } else if (lexer.peek().tag == Token::LPAR) {
       lexer.get();
     } else { // is var
-      return parse_var_decl(lexer, false, type, std::move(name));
+      VarDecl result = parse_var_decl(lexer, false, type, std::move(name));
+      if (lexer.get().tag != Token::SEMICOLON) throw "expected ';'";
+      return result;
     }
     std::vector<ArgDef> args;
     if (lexer.peek().tag != Token::RPAR) {
@@ -110,6 +116,8 @@ Stmt parse_stmt(Lexer & lexer) {
       std::make_unique<Stmt>(std::move(body))
     };
   }
+  case Token::LBRACE:
+    return parse_block(lexer);
   default:
     Stmt stmt = parse_stmt_without_semicolon(lexer);
     if (lexer.get().tag != Token::SEMICOLON) {
@@ -123,7 +131,8 @@ Stmt parse_stmt_without_semicolon(Lexer & lexer) {
   switch (lexer.peek().tag) {
   case Token::RETURN: // return
     lexer.get();
-    return Return{parse_expr(lexer)};
+    if (lexer.peek().tag == Token::SEMICOLON) return Return{{}};
+    else return Return{parse_expr(lexer)};
   case Token::BREAK:
     lexer.get();
     return Break{};
@@ -175,7 +184,7 @@ VarDecl parse_var_decl(Lexer & lexer, bool is_const, Type type, Ident && name) {
     if (lexer.peek().tag != Token::IDENT) throw "expected identifier";
     name = lexer.get().ident;
   }
-  return VarDecl{is_const, type, defs};
+  return VarDecl{is_const, type, std::move(defs)};
 }
 
 // for binary op, returns precedence; for others, returns 0
@@ -314,8 +323,8 @@ Expr parse_var_or_func_call(Lexer & lexer, Ident && ident) {
         if (lexer.peek().tag != Token::COMMA) break;
         lexer.get();
       }
-      if (lexer.peek().tag != Token::RPAR) throw "expected ')'";
-      return FuncCall{ident, args};
+      if (lexer.get().tag != Token::RPAR) throw "expected ')'";
+      return FuncCall{ident, std::move(args)};
     }
   } else {
     return ident;

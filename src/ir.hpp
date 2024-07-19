@@ -17,12 +17,14 @@ using Operand = std::variant<Const, VReg, Global>;
 
 struct Binary {
   enum Op {
-    ADD, SUB, MUL, SDIV, SREM
+    ADD, SUB, MUL, SDIV, SREM,
+    ICMP_SLT, ICMP_SLE, ICMP_SGT, ICMP_SGE, ICMP_EQ, ICMP_NE,
+    AND, OR,
   } op;
   Type type;
-  int result = 0;
   Operand lhs;
   Operand rhs;
+  int result = 0;
 };
 
 struct Ret {
@@ -43,8 +45,8 @@ struct Store {
 
 struct Load {
   Type type;
-  int result = 0;
   Operand ptr;
+  int result = 0;
 };
 
 struct Arg {
@@ -54,12 +56,39 @@ struct Arg {
 
 struct Call {
   Type type;
-  int result = 0;
   Operand func;
   std::vector<Arg> args;
+  int result = 0;
 };
 
-using Instr = std::variant<Binary, Ret, Alloca, Store, Load, Call>;
+struct Zext {
+  Type from_type;
+  Operand value;
+  Type to_type;
+  int result = 0;
+};
+
+struct Br {
+  Operand dest;
+};
+
+struct BrCond {
+  Operand cond;
+  Operand iftrue;
+  Operand iffalse;
+};
+
+using Instr = std::variant<
+  Binary,
+  Ret,
+  Alloca,
+  Store,
+  Load,
+  Call,
+  Zext,
+  Br,
+  BrCond
+>;
 
 struct Block : std::vector<Instr> {
   int label = 0;
@@ -83,7 +112,13 @@ struct GlobalVar {
   int value;
 };
 
-using GlobalDef = std::variant<Func, GlobalVar>;
+struct FuncDecl {
+  Type rettype;
+  std::string name;
+  std::vector<Type> args;
+};
+
+using GlobalDef = std::variant<Func, GlobalVar, FuncDecl>;
 
 using Program = std::vector<GlobalDef>;
 

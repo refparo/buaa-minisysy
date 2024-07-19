@@ -55,7 +55,9 @@ Token Lexer::lex_incl_space() {
     std::string head{char(c)};
     switch (c) {
     case 'i':
-      c = in.get();
+      c = in.peek();
+      if (!(is_nondigit(c) || is_digit(c))) return Token(std::move(head));
+      in.get();
       head.push_back(c);
       switch (c) {
         case 'f': return Token::IF;
@@ -66,13 +68,19 @@ Token Lexer::lex_incl_space() {
     case 'w': return lex_keyword(std::move(head), "hile", Token::WHILE);
     case 'b': return lex_keyword(std::move(head), "reak", Token::BREAK);
     case 'c':
-      c = in.get();
+      c = in.peek();
+      if (!(is_nondigit(c) || is_digit(c))) return Token(std::move(head));
+      in.get();
       head.push_back(c);
       if (c != 'o') return lex_ident(std::move(head));
-      c = in.get();
+      c = in.peek();
+      if (!(is_nondigit(c) || is_digit(c))) return Token(std::move(head));
+      in.get();
       head.push_back(c);
       if (c != 'n') return lex_ident(std::move(head));
-      c = in.get();
+      c = in.peek();
+      if (!(is_nondigit(c) || is_digit(c))) return Token(std::move(head));
+      in.get();
       head.push_back(c);
       switch (c) {
         case 's': return lex_keyword(std::move(head), "t", Token::CONST);

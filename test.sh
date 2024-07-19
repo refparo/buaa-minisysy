@@ -4,17 +4,31 @@ cd build
 cmake --build . -j8
 cd ..
 
-failed=()
+ir_failed=()
+out_failed=()
 
 target=build/a.out
 echo testing $target:
 for in in tests/*.in; do
+  [[ $in == *.ll.in ]] && continue
   echo test $in:
-  out=${in%in}out
-  if [ -f $out ]; then
-    diff <($target < $in) <(< $out) && echo ok || failed+=($in)
+  ll=${in%in}ll
+  if [ -f $ll ]; then
+    $target < $in > build/a.ll
+    diff build/a.ll $ll && echo ir ok || ir_failed+=($in)
+    llvm-link build/a.ll libsysy/libsysy.ll -S -o build/a.ll
+    llret=${in%in}ll.ret
+    if [ -f $llret ]; then
+      lli build/a.ll
+      [ $? -eq $(cat $llret) ] && echo ret ok || out_failed+=($in)
+    fi
+    llout=${in%in}ll.out
+    if [ -f $llout ]; then
+      diff -b <(lli build/a.ll < ${in%in}ll.in) <(< $llout) && echo out ok || out_failed+=($in)
+    fi
+    rm build/a.ll
   else
-    $target < $in > /dev/null && failed+=($in) || echo ok
+    $target < $in > /dev/null && ir_failed+=($in) || echo ok
   fi
 done
 
@@ -23,10 +37,15 @@ echo testing $target:
 for in in labLexer/tests/*.in; do
   echo test $in:
   out=${in%in}out
-  diff <($target < $in) <(< $out) && echo ok || failed+=($in)
+  diff <($target < $in) <(< $out) && echo ok || ir_failed+=($in)
 done
 
-echo failed tests:
-for in in ${failed[*]}; do
+echo ir failed tests:
+for in in ${ir_failed[*]}; do
+  echo $in
+done
+
+echo out failed tests:
+for in in ${out_failed[*]}; do
   echo $in
 done

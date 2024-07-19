@@ -4,25 +4,61 @@
 #include "ir.hpp"
 
 struct Symbol {
-  enum {
+  enum Kind {
     CONST, VAR, FUNC
   } kind;
+  ir::Type type; // int or void
+  int argc; // currently only int args are supported
   ir::Operand ir;
 };
 
-using Context = std::map<std::string, Symbol>;
+using Scope = std::map<std::string, Symbol>;
+
+struct LoopContext {
+  // vreg of begin of loop.
+  int loop_begin;
+  // blocks that need to be added a break
+  std::vector<int> break_idxs;
+};
+
+struct TypedOperand {
+  ir::Type type;
+  ir::Operand inner;
+};
 
 struct Codegen {
 private:
-  std::vector<Context> symtable;
+  std::vector<Scope> scopes;
+  std::vector<LoopContext> loop_contexts;
+  int vreg_counter;
   ir::Program ir;
 
 public:
   Codegen();
 
+  ir::Program get() &&;
   void add_program(const ast::Program & program);
-  ir::Program get() const &&;
 
 private:
   void add_func(const ast::Func & func);
+  void add_var_decl(const ast::VarDecl & decl);
+  void add_stmt(const ast::Stmt & stmt);
+  TypedOperand add_expr(const ast::Expr & expr);
+  ir::Operand cast(TypedOperand operand, ir::Type type);
+
+  inline Scope & get_scope() {
+    return this->scopes.back();
+  }
+  inline LoopContext & get_loop_context() {
+    if (this->loop_contexts.empty()) throw "break or continue used outside loop";
+    return this->loop_contexts.back();
+  }
+  inline ir::Func & get_func() {
+    return std::get<ir::Func>(this->ir.back());
+  }
+  inline ir::Block & get_block() {
+    return get_func().blocks.back();
+  }
+  const Symbol & get_symbol(const ast::Ident & ident);
+  int eval_constexpr(const ast::Expr & expr);
 };
