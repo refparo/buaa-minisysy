@@ -25,12 +25,14 @@ std::ostream & operator<<(std::ostream & out, const ir::GlobalDef & def) {
       }
       out << ") {" << std::endl;
       // body
-      for (auto block : func.blocks) {
-        if (block.label > 0) {
-          out << std::endl;
-          out << block.label << ":" << std::endl;
-        }
-        for (auto instr : block) {
+      auto block = func.blocks.begin();
+      for (auto instr : *block) {
+        out << instr;
+      }
+      for (block++; block != func.blocks.end(); block++) {
+        out << std::endl;
+        out << block->label << ":" << std::endl;
+        for (auto instr : *block) {
           out << instr;
         }
       }

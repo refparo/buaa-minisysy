@@ -78,7 +78,7 @@ void Codegen::add_func(const ast::Func & func) {
     rettype,
     func.name,
     args,
-    {ir::Block{{}, 0}}
+    {ir::Block{{}, this->vreg_counter++}}
   });
 
   // add func to scope
@@ -148,7 +148,7 @@ void Codegen::add_var_decl(const ast::VarDecl & decl) {
         // if in block
         auto & block = get_block();
         for (auto & def : decl.defs) {
-          int vreg = ++this->vreg_counter;
+          int vreg = this->vreg_counter++;
           block.push_back(ir::Alloca{ir::I32, vreg});
           auto [_, success] = get_scope().insert({def.name,
             Symbol{
@@ -180,13 +180,13 @@ void Codegen::add_stmt(const ast::Stmt & stmt) {
       auto cond = cast(add_expr(stmt.cond), ir::I1);
 
       // body block
-      int body_begin = ++this->vreg_counter;
+      int body_begin = this->vreg_counter++;
       func.blocks.push_back(ir::Block{{}, body_begin});
       add_stmt(*stmt.true_body);
       int body_block_idx = func.blocks.size() - 1;
 
       // after block
-      int after_if = ++this->vreg_counter;
+      int after_if = this->vreg_counter++;
       func.blocks.push_back(ir::Block{{}, after_if});
 
       // add branches
@@ -205,19 +205,19 @@ void Codegen::add_stmt(const ast::Stmt & stmt) {
       int cond_block_idx = func.blocks.size() - 1;
 
       // true block
-      int true_begin = ++this->vreg_counter;
+      int true_begin = this->vreg_counter++;
       func.blocks.push_back(ir::Block{{}, true_begin});
       add_stmt(*stmt.true_body);
       int true_block_idx = func.blocks.size() - 1;
 
       // false block
-      int false_begin = ++this->vreg_counter;
+      int false_begin = this->vreg_counter++;
       func.blocks.push_back(ir::Block{{}, false_begin});
       add_stmt(*stmt.false_body);
       int false_block_idx = func.blocks.size() - 1;
 
       // after block
-      int after_if = ++this->vreg_counter;
+      int after_if = this->vreg_counter++;
       func.blocks.push_back(ir::Block{{}, after_if});
 
       // add branches
@@ -233,21 +233,21 @@ void Codegen::add_stmt(const ast::Stmt & stmt) {
       auto & func = get_func();
 
       // cond block
-      int loop_begin = ++this->vreg_counter;
+      int loop_begin = this->vreg_counter++;
       func.blocks.back().push_back(ir::Br{ir::VReg{loop_begin}});
       func.blocks.push_back(ir::Block{{}, loop_begin});
       auto cond = cast(add_expr(stmt.cond), ir::I1);
       int cond_block_idx = func.blocks.size() - 1;
 
       // body block
-      int body_begin = ++this->vreg_counter;
+      int body_begin = this->vreg_counter++;
       func.blocks.push_back(ir::Block{{}, body_begin});
       this->loop_contexts.push_back(LoopContext{loop_begin});
       add_stmt(*stmt.body);
       func.blocks.back().push_back(ir::Br{ir::VReg{loop_begin}});
 
       // after block
-      int after_loop = ++this->vreg_counter;
+      int after_loop = this->vreg_counter++;
       func.blocks.push_back(ir::Block{{}, after_loop});
 
       // add conditional branch and fix breaks
@@ -292,17 +292,17 @@ void Codegen::add_stmt(const ast::Stmt & stmt) {
         }
         get_block().push_back(ir::Ret{ir::VOID});
       }
-      get_func().blocks.push_back(ir::Block{{}, ++this->vreg_counter});
+      get_func().blocks.push_back(ir::Block{{}, this->vreg_counter++});
     },
     [this](const ast::Break & _) {
       auto & context = get_loop_context();
       context.break_idxs.push_back(int(get_func().blocks.size()) - 1);
-      get_func().blocks.push_back(ir::Block{{}, ++this->vreg_counter});
+      get_func().blocks.push_back(ir::Block{{}, this->vreg_counter++});
     },
     [this](const ast::Continue & _) {
       auto & context = get_loop_context();
       get_block().push_back(ir::Br{ir::VReg{context.loop_begin}});
-      get_func().blocks.push_back(ir::Block{{}, ++this->vreg_counter});
+      get_func().blocks.push_back(ir::Block{{}, this->vreg_counter++});
     },
     [this](const ast::Expr & expr) {
       add_expr(expr);
@@ -388,7 +388,7 @@ TypedOperand Codegen::add_expr(const ast::Expr & expr) {
       }
       auto lhs = cast(add_expr(*expr.lhs), operand_type);
       auto rhs = cast(add_expr(*expr.rhs), operand_type);
-      int vreg = ++this->vreg_counter;
+      int vreg = this->vreg_counter++;
       get_block().push_back(ir::Binary{op, operand_type, lhs, rhs, vreg});
       return TypedOperand{result_type, ir::VReg{vreg}};
     },
@@ -399,7 +399,7 @@ TypedOperand Codegen::add_expr(const ast::Expr & expr) {
       case ast::Unary::NEG:
       {
         auto operand = cast(add_expr(*expr.operand), ir::I32);
-        int vreg = ++this->vreg_counter;
+        int vreg = this->vreg_counter++;
         get_block().push_back(ir::Binary{
           ir::Binary::SUB,
           ir::I32,
@@ -412,7 +412,7 @@ TypedOperand Codegen::add_expr(const ast::Expr & expr) {
       case ast::Unary::NOT:
       {
         auto operand = add_expr(*expr.operand);
-        int vreg = ++this->vreg_counter;
+        int vreg = this->vreg_counter++;
         get_block().push_back(ir::Binary{
           ir::Binary::ICMP_EQ,
           operand.type,
@@ -432,7 +432,7 @@ TypedOperand Codegen::add_expr(const ast::Expr & expr) {
       for (auto & arg : expr.args) {
         args.push_back(ir::Arg{ir::I32, cast(add_expr(arg), ir::I32)});
       }
-      int vreg = symbol.type != ir::VOID ? ++this->vreg_counter : 0;
+      int vreg = symbol.type != ir::VOID ? this->vreg_counter++ : 0;
       get_block().push_back(ir::Call{
         symbol.type,
         symbol.ir,
@@ -447,7 +447,7 @@ TypedOperand Codegen::add_expr(const ast::Expr & expr) {
       case Symbol::CONST: return TypedOperand{symbol.type, symbol.ir};
       case Symbol::VAR:
       {
-        int vreg = ++this->vreg_counter;
+        int vreg = this->vreg_counter++;
         get_block().push_back(ir::Load{
           symbol.type,
           symbol.ir,
@@ -466,7 +466,7 @@ TypedOperand Codegen::add_expr(const ast::Expr & expr) {
 
 ir::Operand Codegen::cast(TypedOperand operand, ir::Type type) {
   if (operand.type != type) {
-    int vreg = ++this->vreg_counter;
+    int vreg = this->vreg_counter++;
     if (operand.type == ir::I1 && type == ir::I32) {
       get_block().push_back(ir::Zext{ir::I1, operand.inner, ir::I32, vreg});
     } else if (operand.type == ir::I32 && type == ir::I1) {
