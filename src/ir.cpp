@@ -3,6 +3,34 @@
 #include "ir.hpp"
 #include "overloaded.hpp"
 
+constexpr bool has_result(const ir::Instr & instr) {
+  return std::visit(overloaded {
+    [](const ir::Binary & instr) { return true; },
+    [](const ir::Alloca & instr) { return true; },
+    [](const ir::Store & instr) { return false; },
+    [](const ir::Load & instr) { return true; },
+    [](const ir::Call & instr) { return instr.type == ir::I32; },
+    [](const ir::Zext & instr) { return true; },
+    [](const ir::Phi & instr) { return true; },
+  }, instr);
+}
+
+void assign_vregs(ir::Program & program) {
+  for (auto & def : program) {
+    if (def.index() != 0) continue;
+    auto & func = std::get<ir::Func>(def);
+    int vreg = int(func.args.size());
+    for (auto & block : func.blocks) {
+      block.label = vreg++;
+      for (auto & instr : block.body) {
+        if (has_result(instr)) {
+          instr.vreg = vreg++;
+        }
+      }
+    }
+  }
+}
+
 std::ostream & operator<<(std::ostream & out, const ir::Program & program) {
   for (auto & def : program) {
     out << def;
@@ -17,31 +45,22 @@ std::ostream & operator<<(std::ostream & out, const ir::GlobalDef & def) {
       out << "define dso_local " << func.rettype
           << " @" << func.name << '(';
       if (!func.args.empty()) {
-        auto arg = func.args.begin();
-        out << arg->type << ' ' << '%' << arg->vreg;
-        for (arg++; arg != func.args.end(); arg++) {
-          out << ", " << arg->type << ' ' << '%' << arg->vreg;
+        out << func.args[0] << ' ' << "%0";
+        for (int i = 1; i < func.args.size(); i++) {
+          out << ", " << func.args[i] << ' ' << '%' << i;
         }
       }
       out << ") {" << std::endl;
       // body
       auto block = func.blocks.begin();
-      for (auto instr : *block) {
-        out << instr;
-      }
+      out << *block;
       for (block++; block != func.blocks.end(); block++) {
         out << std::endl;
-        out << block->label << ":" << std::endl;
-        for (auto instr : *block) {
-          out << instr;
-        }
+        out << block->label << ':' << std::endl;
+        out << *block;
       }
       // end
       out << "}";
-    },
-    [&out](const ir::GlobalVar & var) {
-      out << '@' << var.name << " = dso_local global " << var.type << ' '
-          << var.value;
     },
     [&out](const ir::FuncDecl & func) {
       // first line
@@ -56,8 +75,24 @@ std::ostream & operator<<(std::ostream & out, const ir::GlobalDef & def) {
       }
       out << ")";
     },
+    [&out](const ir::GlobalVar & var) {
+      out << '@' << var.name << " = dso_local global " << var.type << ' '
+          << var.value;
+    },
   }, def);
   return out << std::endl;
+}
+
+std::ostream & operator<<(std::ostream & out, const ir::Block & block) {
+  for (auto & instr : block.body) {
+    out << "    ";
+    if (has_result(instr)) {
+      out << '%' << instr.vreg << " = ";
+    }
+    out << instr;
+  }
+  out << "    " << block.terminator;
+  return out;
 }
 
 static std::ostream & operator<<(std::ostream & out, ir::Binary::Op op) {
@@ -80,11 +115,10 @@ static std::ostream & operator<<(std::ostream & out, ir::Binary::Op op) {
 }
 
 std::ostream & operator<<(std::ostream & out, const ir::Instr & instr) {
-  out << "    ";
   std::visit(overloaded {
     [&out](const ir::Binary & instr) {
-      out << '%' << instr.result << " = " << instr.op << ' '
-          << instr.type << ' ' << instr.lhs << ", " << instr.rhs;
+      out << instr.op << ' ' << instr.type << ' '
+          << instr.lhs << ", " << instr.rhs;
     },
     [&out](const ir::Ret & instr) {
       if (instr.type == ir::VOID) {
@@ -94,35 +128,54 @@ std::ostream & operator<<(std::ostream & out, const ir::Instr & instr) {
       }
     },
     [&out](const ir::Alloca & instr) {
-      out << '%' << instr.result << " = alloca " << instr.type;
+      out << "alloca " << instr.type;
     },
     [&out](const ir::Store & instr) {
       out << "store " << instr.type << ' ' << instr.from
           << ", ptr " << instr.ptr;
     },
     [&out](const ir::Load & instr) {
-      out << '%' << instr.result << " = load " << instr.type
-          << ", ptr " << instr.ptr;
+      out << "load " << instr.type << ", ptr " << instr.ptr;
     },
     [&out](const ir::Call & instr) {
-      if (instr.type != ir::VOID) {
-        out << '%' << instr.result << " = ";
-      }
       out << "call " << instr.type << ' '
           << instr.func << '(';
       if (!instr.args.empty()) {
         auto arg = instr.args.begin();
-        out << arg->type << ' ' << arg->value;
+        out << arg->first << ' ' << arg->second;
         for (arg++; arg != instr.args.end(); arg++) {
-          out << ", " << arg->type << ' ' << arg->value;
+          out << ", " << arg->first << ' ' << arg->second;
         }
       }
       out << ')';
     },
     [&out](const ir::Zext & instr) {
-      out << '%' << instr.result << " = zext "
-          << instr.from_type << ' ' << instr.value
+      out << "zext " << instr.from_type << ' ' << instr.value
           << " to " << instr.to_type;
+    },
+    [&out](const ir::Phi & instr) {
+      out << "phi " << instr.type << ' ';
+      auto source = instr.sources.begin();
+      out << '[' << source->first << ", " << source->second << ']';
+      for (source++; source != instr.sources.end(); source++) {
+        out << ", [" << source->first << ", " << source->second << ']';
+      }
+    },
+  }, instr);
+  return out << std::endl;
+}
+
+std::ostream & operator<<(std::ostream & out, const ir::Terminator & instr) {
+  std::visit(overloaded {
+    [&out](std::monostate _) {
+      throw "block not terminated!";
+    },
+    [&out](const ir::Ret & instr) {
+      if (instr.type == ir::VOID) {
+        out << "ret void";
+      } else {
+        out << "ret " << instr.type << ' ' << instr.retval;
+      }
     },
     [&out](const ir::Br & instr) {
       out << "br label " << instr.dest;
@@ -140,14 +193,21 @@ std::ostream & operator<<(std::ostream & out, const ir::Operand & operand) {
     [&out](const ir::Const operand) {
       out << operand.value;
     },
-    [&out](const ir::VReg operand) {
-      out << '%' << operand.vreg;
+    [&out](const ir::Var operand) {
+      out << '%' << operand->vreg;
     },
-    [&out](const ir::Global operand) {
-      out << '@' << operand.name;
+    [&out](const ir::Arg operand) {
+      out << '%' << operand.idx;
+    },
+    [&out](const ir::Global & operand) {
+      out << '@' << operand;
     },
   }, operand);
   return out;
+}
+
+std::ostream & operator<<(std::ostream & out, const ir::Label & label) {
+  return out << '%' <<  label->label;
 }
 
 std::ostream & operator<<(std::ostream & out, const ir::Type & type) {

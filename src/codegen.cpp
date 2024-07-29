@@ -18,16 +18,16 @@ Codegen::Codegen() : scopes{Scope{}} {}
 ir::Program Codegen::get() && {
   ir::Program result;
   if (this->scopes.front().contains("getch")) {
-    result.push_back(ir::FuncDecl{ir::I32, "getch", {}});
+    result.emplace_back(ir::FuncDecl{ir::I32, "getch", {}});
   }
   if (this->scopes.front().contains("putch")) {
-    result.push_back(ir::FuncDecl{ir::VOID, "putch", {ir::I32}});
+    result.emplace_back(ir::FuncDecl{ir::VOID, "putch", {ir::I32}});
   }
   if (this->scopes.front().contains("getint")) {
-    result.push_back(ir::FuncDecl{ir::I32, "getint", {}});
+    result.emplace_back(ir::FuncDecl{ir::I32, "getint", {}});
   }
   if (this->scopes.front().contains("putint")) {
-    result.push_back(ir::FuncDecl{ir::VOID, "putint", {ir::I32}});
+    result.emplace_back(ir::FuncDecl{ir::VOID, "putint", {ir::I32}});
   }
   result.insert(
     result.end(),
@@ -53,7 +53,7 @@ void Codegen::add_program(const ast::Program & program) {
 
 void Codegen::add_func(const ast::Func & func) {
   Scope scope;
-  std::vector<ir::ArgDef> args;
+  std::vector<ir::Type> args;
 
   // args
   for (int i = 0; i < func.args.size(); i++) {
@@ -62,23 +62,19 @@ void Codegen::add_func(const ast::Func & func) {
     auto [_, success] = scope.insert({
       arg.name,
       // we can't assign to arguments!
-      Symbol{Symbol::CONST, ir::I32, 0, ir::VReg{i}}
+      Symbol{Symbol::CONST, ir::I32, 0, ir::Arg{i}}
     });
     if (!success) throw "duplicate argument name";
-    args.push_back(ir::ArgDef{ir::I32, i});
+    args.push_back(ir::I32);
   }
 
-  // initialize vreg counter
-  this->vreg_counter = args.size();
-
   // add func to ir
-  int func_idx = this->ir.size();
   ir::Type rettype = ast_type_to_ir_type(func.rettype);
-  this->ir.push_back(ir::Func{
+  this->ir.emplace_back(ir::Func{
     rettype,
     func.name,
     args,
-    {ir::Block{{}, this->vreg_counter++}}
+    {ir::Block{}}
   });
 
   // add func to scope
@@ -127,41 +123,30 @@ void Codegen::add_var_decl(const ast::VarDecl & decl) {
       if (this->scopes.size() == 1) {
         // if global
         for (auto & def : decl.defs) {
-          this->ir.push_back(ir::GlobalVar{
+          this->ir.emplace_back(ir::GlobalVar{
             def.name,
             ir::I32,
             def.init.has_value()
             ? eval_constexpr(def.init.value())
             : 0
           });
-          auto [_, success] = get_scope().insert({def.name,
-            Symbol{
-              Symbol::VAR,
-              ir::I32,
-              0,
-              ir::Global{def.name}
-            }
-          });
+          auto [_, success] = get_scope().insert(
+            {def.name, Symbol{Symbol::VAR, ir::I32, 0, ir::Global{def.name}}}
+          );
           if (!success) throw "redeclared variable";
         }
       } else {
         // if in block
-        auto & block = get_block();
+        auto block = get_block();
         for (auto & def : decl.defs) {
-          int vreg = this->vreg_counter++;
-          block.push_back(ir::Alloca{ir::I32, vreg});
-          auto [_, success] = get_scope().insert({def.name,
-            Symbol{
-              Symbol::VAR,
-              ir::I32,
-              0,
-              ir::VReg{vreg}
-            }
-          });
+          auto var = block->push_back(ir::Alloca{ir::I32});
+          auto [_, success] = get_scope().insert(
+            {def.name, Symbol{Symbol::VAR, ir::I32, 0, var}}
+          );
           if (!success) throw "redeclared variable";
           if (def.init.has_value()) {
             auto result = cast(add_expr(def.init.value()), ir::I32);
-            block.push_back(ir::Store{ir::I32, result, ir::VReg{vreg}});
+            block->push_back(ir::Store{ir::I32, result, var});
           }
         }
       }
@@ -176,93 +161,77 @@ void Codegen::add_stmt(const ast::Stmt & stmt) {
       auto & func = get_func();
 
       // cond block
-      int cond_block_idx = func.blocks.size() - 1;
       auto cond = cast(add_expr(stmt.cond), ir::I1);
+      auto cond_end = --func.blocks.end();
 
       // body block
-      int body_begin = this->vreg_counter++;
-      func.blocks.push_back(ir::Block{{}, body_begin});
+      auto body_begin = func.new_block();
       add_stmt(*stmt.true_body);
-      int body_block_idx = func.blocks.size() - 1;
+      auto body_end = --func.blocks.end();
 
       // after block
-      int after_if = this->vreg_counter++;
-      func.blocks.push_back(ir::Block{{}, after_if});
+      auto after_if = func.new_block();
 
       // add branches
-      func.blocks[cond_block_idx].push_back(ir::BrCond{
-        cond,
-        ir::VReg{body_begin},
-        ir::VReg{after_if}
-      });
-      func.blocks[body_block_idx].push_back(ir::Br{ir::VReg{after_if}});
+      cond_end->terminator = ir::BrCond{cond, body_begin, after_if};
+      body_end->terminator = ir::Br{after_if};
     },
     [this](const ast::IfElse & stmt) {
       auto & func = get_func();
 
       // cond block
       auto cond = cast(add_expr(stmt.cond), ir::I1);
-      int cond_block_idx = func.blocks.size() - 1;
+      auto cond_end = --func.blocks.end();
 
       // true block
-      int true_begin = this->vreg_counter++;
-      func.blocks.push_back(ir::Block{{}, true_begin});
+      auto true_begin = func.new_block();
       add_stmt(*stmt.true_body);
-      int true_block_idx = func.blocks.size() - 1;
+      auto true_end = --func.blocks.end();
 
       // false block
-      int false_begin = this->vreg_counter++;
-      func.blocks.push_back(ir::Block{{}, false_begin});
+      auto false_begin = func.new_block();
       add_stmt(*stmt.false_body);
-      int false_block_idx = func.blocks.size() - 1;
+      auto false_end = --func.blocks.end();
 
       // after block
-      int after_if = this->vreg_counter++;
-      func.blocks.push_back(ir::Block{{}, after_if});
+      auto after_if = func.new_block();
 
       // add branches
-      func.blocks[cond_block_idx].push_back(ir::BrCond{
-        cond,
-        ir::VReg{true_begin},
-        ir::VReg{false_begin}
-      });
-      func.blocks[true_block_idx].push_back(ir::Br{ir::VReg{after_if}});
-      func.blocks[false_block_idx].push_back(ir::Br{ir::VReg{after_if}});
+      cond_end->terminator = ir::BrCond{cond, true_begin, false_begin};
+      true_end->terminator = ir::Br{after_if};
+      false_end->terminator = ir::Br{after_if};
     },
     [this](const ast::While & stmt) {
       auto & func = get_func();
 
+      // before block
+      auto before_loop = --func.blocks.end();
+
       // cond block
-      int loop_begin = this->vreg_counter++;
-      func.blocks.back().push_back(ir::Br{ir::VReg{loop_begin}});
-      func.blocks.push_back(ir::Block{{}, loop_begin});
+      auto cond_begin = func.new_block();
       auto cond = cast(add_expr(stmt.cond), ir::I1);
-      int cond_block_idx = func.blocks.size() - 1;
+      auto cond_end = --func.blocks.end();
 
       // body block
-      int body_begin = this->vreg_counter++;
-      func.blocks.push_back(ir::Block{{}, body_begin});
-      this->loop_contexts.push_back(LoopContext{loop_begin});
+      auto body_begin = func.new_block();
+      this->loop_contexts.push_back(LoopContext{cond_begin});
       add_stmt(*stmt.body);
-      func.blocks.back().push_back(ir::Br{ir::VReg{loop_begin}});
+      auto body_end = --func.blocks.end();
 
       // after block
-      int after_loop = this->vreg_counter++;
-      func.blocks.push_back(ir::Block{{}, after_loop});
+      auto after_loop = func.new_block();
 
       // add conditional branch and fix breaks
-      func.blocks[cond_block_idx].push_back(ir::BrCond{
-        cond,
-        ir::VReg{body_begin},
-        ir::VReg{after_loop}
-      });
-      for (auto block_idx : this->loop_contexts.back().break_idxs) {
-        func.blocks[block_idx].push_back(ir::Br{ir::VReg{after_loop}});
+      before_loop->terminator = ir::Br{cond_begin};
+      cond_end->terminator = ir::BrCond{cond, body_begin, after_loop};
+      for (auto break_block : this->loop_contexts.back().breaks) {
+        break_block->terminator = ir::Br{after_loop};
       }
       this->loop_contexts.pop_back();
+      body_end->terminator = ir::Br{cond_begin};
     },
     [this](const ast::Block & block) {
-      this->scopes.push_back(Scope{});
+      this->scopes.emplace_back();
       for (auto & stmt : block) {
         add_stmt(stmt);
       }
@@ -271,7 +240,7 @@ void Codegen::add_stmt(const ast::Stmt & stmt) {
     [this](const ast::Assign & stmt) {
       auto & symbol = get_symbol(stmt.var);
       if (symbol.kind != Symbol::VAR) throw "can't assign to constant or function";
-      get_block().push_back(ir::Store{
+      get_block()->push_back(ir::Store{
         symbol.type,
         cast(add_expr(stmt.value), symbol.type),
         symbol.ir
@@ -282,27 +251,27 @@ void Codegen::add_stmt(const ast::Stmt & stmt) {
         if (get_func().rettype != ir::I32) {
           throw "can't return a value from a function with rettype void";
         }
-        get_block().push_back(ir::Ret{
+        get_block()->terminator = ir::Ret{
           ir::I32,
           cast(add_expr(stmt.retval.value()), ir::I32)
-        });
+        };
       } else {
         if (get_func().rettype != ir::VOID) {
           throw "can't return without a value from a function with rettype int";
         }
-        get_block().push_back(ir::Ret{ir::VOID});
+        get_block()->terminator = ir::Ret{ir::VOID};
       }
-      get_func().blocks.push_back(ir::Block{{}, this->vreg_counter++});
+      get_func().new_block();
     },
     [this](const ast::Break & _) {
       auto & context = get_loop_context();
-      context.break_idxs.push_back(int(get_func().blocks.size()) - 1);
-      get_func().blocks.push_back(ir::Block{{}, this->vreg_counter++});
+      context.breaks.push_back(get_block());
+      get_func().new_block();
     },
     [this](const ast::Continue & _) {
       auto & context = get_loop_context();
-      get_block().push_back(ir::Br{ir::VReg{context.loop_begin}});
-      get_func().blocks.push_back(ir::Block{{}, this->vreg_counter++});
+      get_block()->terminator = ir::Br{context.loop_begin};
+      get_func().new_block();
     },
     [this](const ast::Expr & expr) {
       add_expr(expr);
@@ -316,9 +285,11 @@ void Codegen::add_stmt(const ast::Stmt & stmt) {
 TypedOperand Codegen::add_expr(const ast::Expr & expr) {
   return std::visit(overloaded {
     [this](const ast::Binary & expr) {
+      // NOLINTBEGIN(cppcoreguidelines-init-variables)
       ir::Binary::Op op;
       ir::Type operand_type;
       ir::Type result_type;
+      // NOLINTEND(cppcoreguidelines-init-variables)
       switch (expr.op) {
       case ast::Binary::PLUS:
         op = ir::Binary::ADD;
@@ -388,9 +359,8 @@ TypedOperand Codegen::add_expr(const ast::Expr & expr) {
       }
       auto lhs = cast(add_expr(*expr.lhs), operand_type);
       auto rhs = cast(add_expr(*expr.rhs), operand_type);
-      int vreg = this->vreg_counter++;
-      get_block().push_back(ir::Binary{op, operand_type, lhs, rhs, vreg});
-      return TypedOperand{result_type, ir::VReg{vreg}};
+      auto vreg = get_block()->push_back(ir::Binary{op, operand_type, lhs, rhs});
+      return TypedOperand{result_type, vreg};
     },
     [this](const ast::Unary & expr) {
       switch (expr.op) {
@@ -399,28 +369,24 @@ TypedOperand Codegen::add_expr(const ast::Expr & expr) {
       case ast::Unary::NEG:
       {
         auto operand = cast(add_expr(*expr.operand), ir::I32);
-        int vreg = this->vreg_counter++;
-        get_block().push_back(ir::Binary{
+        auto vreg = get_block()->push_back(ir::Binary{
           ir::Binary::SUB,
           ir::I32,
           ir::Const{0},
-          operand,
-          vreg
+          operand
         });
-        return TypedOperand{ir::I32, ir::VReg{vreg}};
+        return TypedOperand{ir::I32, vreg};
       }
       case ast::Unary::NOT:
       {
         auto operand = add_expr(*expr.operand);
-        int vreg = this->vreg_counter++;
-        get_block().push_back(ir::Binary{
+        auto vreg = get_block()->push_back(ir::Binary{
           ir::Binary::ICMP_EQ,
           operand.type,
           operand.inner,
-          ir::Const{0},
-          vreg
+          ir::Const{0}
         });
-        return TypedOperand{ir::I1, ir::VReg{vreg}};
+        return TypedOperand{ir::I1, vreg};
       }
       }
     },
@@ -428,18 +394,17 @@ TypedOperand Codegen::add_expr(const ast::Expr & expr) {
       auto & symbol = get_symbol(expr.func);
       if (symbol.kind != Symbol::FUNC) throw "variable used as a function";
       if (expr.args.size() != symbol.argc) throw "mismatched number of arguments";
-      std::vector<ir::Arg> args;
+      std::vector<std::pair<ir::Type, ir::Operand>> args;
+      args.reserve(expr.args.size());
       for (auto & arg : expr.args) {
-        args.push_back(ir::Arg{ir::I32, cast(add_expr(arg), ir::I32)});
+        args.emplace_back(ir::I32, cast(add_expr(arg), ir::I32));
       }
-      int vreg = symbol.type != ir::VOID ? this->vreg_counter++ : 0;
-      get_block().push_back(ir::Call{
+      auto vreg = get_block()->push_back(ir::Call{
         symbol.type,
         symbol.ir,
-        std::move(args),
-        vreg
+        std::move(args)
       });
-      return TypedOperand{symbol.type, ir::VReg{vreg}};
+      return TypedOperand{symbol.type, vreg};
     },
     [this](const ast::Ident & ident) {
       auto & symbol = get_symbol(ident);
@@ -447,13 +412,11 @@ TypedOperand Codegen::add_expr(const ast::Expr & expr) {
       case Symbol::CONST: return TypedOperand{symbol.type, symbol.ir};
       case Symbol::VAR:
       {
-        int vreg = this->vreg_counter++;
-        get_block().push_back(ir::Load{
+        auto vreg = get_block()->push_back(ir::Load{
           symbol.type,
-          symbol.ir,
-          vreg
+          symbol.ir
         });
-        return TypedOperand{symbol.type, ir::VReg{vreg}};
+        return TypedOperand{symbol.type, vreg};
       }
       case Symbol::FUNC: throw "function used as a variable";
       }
@@ -464,23 +427,22 @@ TypedOperand Codegen::add_expr(const ast::Expr & expr) {
   }, expr);
 }
 
-ir::Operand Codegen::cast(TypedOperand operand, ir::Type type) {
+ir::Operand Codegen::cast(const TypedOperand && operand, ir::Type type) {
   if (operand.type != type) {
-    int vreg = this->vreg_counter++;
+    ir::InstrRef vreg;
     if (operand.type == ir::I1 && type == ir::I32) {
-      get_block().push_back(ir::Zext{ir::I1, operand.inner, ir::I32, vreg});
+      vreg = get_block()->push_back(ir::Zext{ir::I1, operand.inner, ir::I32});
     } else if (operand.type == ir::I32 && type == ir::I1) {
-      get_block().push_back(ir::Binary{
+      vreg = get_block()->push_back(ir::Binary{
         ir::Binary::ICMP_NE,
         ir::I32,
         operand.inner,
-        ir::Const{0},
-        vreg
+        ir::Const{0}
       });
     } else {
       throw "unsupported cast";
     }
-    return ir::VReg{vreg};
+    return vreg;
   } else {
     return operand.inner;
   }

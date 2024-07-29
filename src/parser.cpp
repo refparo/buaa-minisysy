@@ -21,6 +21,8 @@ static Expr parse_var_or_func_call(Lexer & lexer, Ident && ident);
 
 static Type parse_type(Lexer & lexer);
 
+// NOLINTBEGIN(cppcoreguidelines-pro-type-union-access)
+
 Program parse(Lexer & lexer) {
   Program program;
   while (lexer.peek().tag != Token::ERR) {
@@ -189,22 +191,31 @@ VarDecl parse_var_decl(Lexer & lexer, bool is_const, Type type, Ident && name) {
 
 // for binary op, returns precedence; for others, returns 0
 static constexpr int prec(Token::Tag op) {
+  // NOLINTBEGIN(cppcoreguidelines-avoid-magic-numbers)
   switch (op) {
-  case Token::MULT: return 9;
-  case Token::DIV: return 9;
-  case Token::MOD: return 9;
-  case Token::PLUS: return 8;
-  case Token::MINUS: return 8;
-  case Token::LT: return 7;
-  case Token::LTEQ: return 7;
-  case Token::GT: return 7;
-  case Token::GTEQ: return 7;
-  case Token::EQ: return 6;
-  case Token::NEQ: return 6;
-  case Token::AND: return 5;
-  case Token::OR: return 4;
-  default: return 0;
+  case Token::MULT:
+  case Token::DIV:
+  case Token::MOD:
+    return 9;
+  case Token::PLUS:
+  case Token::MINUS:
+    return 8;
+  case Token::LT:
+  case Token::LTEQ:
+  case Token::GT:
+  case Token::GTEQ:
+    return 7;
+  case Token::EQ:
+  case Token::NEQ:
+    return 6;
+  case Token::AND:
+    return 5;
+  case Token::OR:
+    return 4;
+  default:
+    return 0;
   }
+  // NOLINTEND(cppcoreguidelines-avoid-magic-numbers)
 }
 
 static constexpr Binary::Op tok_to_binary(Token::Tag op) {
@@ -256,10 +267,12 @@ Expr parse_expr_beginning_with_ident(Lexer & lexer, Ident && ident, int prev_pre
 
 static constexpr bool is_unary(Token::Tag op) {
   switch (op) {
-  case Token::PLUS: return true;
-  case Token::MINUS: return true;
-  case Token::NOT: return true;
-  default: return false;
+  case Token::PLUS:
+  case Token::MINUS:
+  case Token::NOT:
+    return true;
+  default:
+    return false;
   }
 }
 
@@ -338,3 +351,5 @@ Type parse_type(Lexer & lexer) {
   default: throw "expected 'int' or 'void'";
   }
 }
+
+// NOLINTEND(cppcoreguidelines-pro-type-union-access)

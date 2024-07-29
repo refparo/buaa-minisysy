@@ -2,12 +2,16 @@
 
 #include "token.hpp"
 
+// NOLINTBEGIN(cppcoreguidelines-pro-type-union-access)
+
+// NOLINTBEGIN(cppcoreguidelines-pro-type-member-init)
 Token::Token() : tag(ERR) {}
 Token::Token(std::string && ident) : tag(IDENT), ident(std::move(ident)) {}
 Token::Token(int number) : tag(NUMBER), number(number) {}
 Token::Token(Tag tag_) : tag(tag_) {}
+// NOLINTEND(cppcoreguidelines-pro-type-member-init)
 
-Token::Token(Token && other) : tag(other.tag) {
+Token::Token(Token && other) noexcept : tag(other.tag) {
   switch (other.tag) {
   case IDENT: new(&ident) std::string{std::move(other.ident)}; break;
   case NUMBER: number = other.number; break;
@@ -15,7 +19,7 @@ Token::Token(Token && other) : tag(other.tag) {
   }
 }
 
-Token & Token::operator=(Token && other) {
+Token & Token::operator=(Token && other) noexcept {
   this->~Token();
   new(this) Token(std::move(other));
   return *this;
@@ -67,3 +71,5 @@ std::ostream & operator<<(std::ostream & out, const Token & tok) {
   }
   return out;
 }
+
+// NOLINTEND(cppcoreguidelines-pro-type-union-access)

@@ -2,7 +2,7 @@
 
 struct Lexer {
 private:
-  std::istream & in;
+  std::istream & in; // NOLINT(cppcoreguidelines-avoid-const-or-ref-data-members)
   bool has_next;
   Token next;
 

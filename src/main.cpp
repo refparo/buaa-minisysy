@@ -9,7 +9,9 @@ int main() {
     auto ast = parse(lexer);
     Codegen codegen;
     codegen.add_program(ast);
-    std::cout << std::move(codegen).get();
+    auto program = std::move(codegen).get();
+    assign_vregs(program);
+    std::cout << program;
   } catch (const char * err) {
     std::cout << err << std::endl;
     return 1;

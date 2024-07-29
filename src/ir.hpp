@@ -1,5 +1,6 @@
 #pragma once
 
+#include <list>
 #include <string>
 #include <variant>
 #include <vector>
@@ -10,10 +11,20 @@ enum Type {
   VOID, I1, I32, PTR, LABEL
 };
 
+// Operand
+using BlockBody = std::list<struct Instr>;
+using FuncBody = std::list<struct Block>;
+
+using InstrRef = BlockBody::iterator;
+using Label = FuncBody::iterator;
+
 struct Const { int value; };
-struct VReg { int vreg; };
-struct Global { std::string name; };
-using Operand = std::variant<Const, VReg, Global>;
+using Var = InstrRef;
+struct Arg { int idx; };
+using Global = std::string;
+using Operand = std::variant<Const, Var, Arg, Global>;
+
+// instr
 
 struct Binary {
   enum Op {
@@ -24,17 +35,10 @@ struct Binary {
   Type type;
   Operand lhs;
   Operand rhs;
-  int result = 0;
-};
-
-struct Ret {
-  Type type;
-  Operand retval;
 };
 
 struct Alloca {
   Type type;
-  int result = 0;
 };
 
 struct Store {
@@ -46,70 +50,89 @@ struct Store {
 struct Load {
   Type type;
   Operand ptr;
-  int result = 0;
-};
-
-struct Arg {
-  Type type;
-  Operand value;
 };
 
 struct Call {
   Type type;
   Operand func;
-  std::vector<Arg> args;
-  int result = 0;
+  std::vector<std::pair<Type, Operand>> args;
 };
 
 struct Zext {
   Type from_type;
   Operand value;
   Type to_type;
-  int result = 0;
+};
+
+struct Phi {
+  Type type;
+  std::vector<std::pair<Operand, Label>> sources;
+};
+
+using Using_Instr = std::variant<
+  Alloca,
+  Store,
+  Load,
+  Binary,
+  Call,
+  Zext,
+  Phi
+>;
+struct Instr : Using_Instr {
+  int vreg;
+
+  using Using_Instr::Using_Instr;
+};
+
+// terminator
+
+struct Ret {
+  Type type;
+  Operand retval;
 };
 
 struct Br {
-  Operand dest;
+  Label dest;
 };
 
 struct BrCond {
   Operand cond;
-  Operand iftrue;
-  Operand iffalse;
+  Label iftrue;
+  Label iffalse;
 };
 
-using Instr = std::variant<
-  Binary,
-  Ret,
-  Alloca,
-  Store,
-  Load,
-  Call,
-  Zext,
-  Br,
-  BrCond
->;
+// std::monostate means no terminator
+using Terminator = std::variant<std::monostate, Ret, Br, BrCond>;
 
-struct Block : std::vector<Instr> {
-  int label = 0;
-};
+// program
 
-struct ArgDef {
-  Type type;
-  int vreg = 0;
+struct Block {
+  BlockBody body;
+  Terminator terminator;
+  int label;
+
+  [[nodiscard]] inline bool terminated() const {
+    return terminator.index() != 0;
+  }
+
+  [[nodiscard]] inline bool empty() const {
+    return body.empty() && !terminated();
+  }
+
+  inline InstrRef push_back(Instr && instr) {
+    return body.insert(body.end(), instr);
+  }
 };
 
 struct Func {
   Type rettype;
   std::string name;
-  std::vector<ArgDef> args;
-  std::vector<Block> blocks;
-};
+  std::vector<Type> args;
+  FuncBody blocks;
 
-struct GlobalVar {
-  std::string name;
-  Type type;
-  int value;
+  inline Label new_block() {
+    return blocks.insert(blocks.end(), Block{});
+  }
 };
 
 struct FuncDecl {
@@ -118,14 +141,25 @@ struct FuncDecl {
   std::vector<Type> args;
 };
 
-using GlobalDef = std::variant<Func, GlobalVar, FuncDecl>;
+struct GlobalVar {
+  std::string name;
+  Type type;
+  int value;
+};
+
+using GlobalDef = std::variant<Func, FuncDecl, GlobalVar>;
 
 using Program = std::vector<GlobalDef>;
 
 }
 
+void assign_vregs(ir::Program & program);
+
 std::ostream & operator<<(std::ostream & out, const ir::Type & type);
 std::ostream & operator<<(std::ostream & out, const ir::Operand & operand);
+std::ostream & operator<<(std::ostream & out, const ir::Label & label);
 std::ostream & operator<<(std::ostream & out, const ir::Instr & instr);
+std::ostream & operator<<(std::ostream & out, const ir::Terminator & instr);
+std::ostream & operator<<(std::ostream & out, const ir::Block & block);
 std::ostream & operator<<(std::ostream & out, const ir::GlobalDef & def);
 std::ostream & operator<<(std::ostream & out, const ir::Program & program);

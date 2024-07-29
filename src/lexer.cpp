@@ -18,7 +18,7 @@ static bool is_space(int c) {
 
 // given the head of an identifier, consume the rest of it and output it
 Token Lexer::lex_ident(std::string && head) {
-  int c;
+  int c; // NOLINT(cppcoreguidelines-init-variables)
   while (true) {
     c = in.peek();
     if (is_nondigit(c) || is_digit(c)) {
@@ -34,7 +34,7 @@ Token Lexer::lex_ident(std::string && head) {
 // consume `tail` and output `token`;
 // if failed, try to consume an identifier instead
 Token Lexer::lex_keyword(std::string && head, const char * tail, Token::Tag tok) {
-  for (; *tail != '\0'; tail++) {
+  for (; *tail != '\0'; tail++) { // NOLINT(cppcoreguidelines-pro-bounds-pointer-arithmetic)
     if (in.peek() == *tail) {
       head.push_back(char(in.get()));
     } else {
@@ -58,7 +58,7 @@ Token Lexer::lex_incl_space() {
       c = in.peek();
       if (!(is_nondigit(c) || is_digit(c))) return Token(std::move(head));
       in.get();
-      head.push_back(c);
+      head.push_back(char(c));
       switch (c) {
         case 'f': return Token::IF;
         case 'n': return lex_keyword(std::move(head), "t", Token::INT);
@@ -71,17 +71,17 @@ Token Lexer::lex_incl_space() {
       c = in.peek();
       if (!(is_nondigit(c) || is_digit(c))) return Token(std::move(head));
       in.get();
-      head.push_back(c);
+      head.push_back(char(c));
       if (c != 'o') return lex_ident(std::move(head));
       c = in.peek();
       if (!(is_nondigit(c) || is_digit(c))) return Token(std::move(head));
       in.get();
-      head.push_back(c);
+      head.push_back(char(c));
       if (c != 'n') return lex_ident(std::move(head));
       c = in.peek();
       if (!(is_nondigit(c) || is_digit(c))) return Token(std::move(head));
       in.get();
-      head.push_back(c);
+      head.push_back(char(c));
       switch (c) {
         case 's': return lex_keyword(std::move(head), "t", Token::CONST);
         case 't': return lex_keyword(std::move(head), "inue", Token::CONTINUE);

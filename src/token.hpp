@@ -1,5 +1,6 @@
 #include <string>
 
+// NOLINTNEXTLINE(cppcoreguidelines-special-member-functions)
 struct Token {
   enum Tag {
     IDENT,
@@ -28,11 +29,11 @@ struct Token {
   Token(int number);
   Token(Tag tag_);
 
-  Token(Token && other);
+  Token(Token && other) noexcept;
 
   ~Token();
 
-  Token & operator=(Token && other);
+  Token & operator=(Token && other) noexcept;
 };
 
 std::ostream & operator<<(std::ostream & out, const Token & tok);

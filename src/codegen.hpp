@@ -15,10 +15,10 @@ struct Symbol {
 using Scope = std::map<std::string, Symbol>;
 
 struct LoopContext {
-  // vreg of begin of loop.
-  int loop_begin;
+  // begin of loop.
+  ir::Label loop_begin;
   // blocks that need to be added a break
-  std::vector<int> break_idxs;
+  std::vector<ir::Label> breaks;
 };
 
 struct TypedOperand {
@@ -30,7 +30,6 @@ struct Codegen {
 private:
   std::vector<Scope> scopes;
   std::vector<LoopContext> loop_contexts;
-  int vreg_counter;
   ir::Program ir;
 
 public:
@@ -44,7 +43,7 @@ private:
   void add_var_decl(const ast::VarDecl & decl);
   void add_stmt(const ast::Stmt & stmt);
   TypedOperand add_expr(const ast::Expr & expr);
-  ir::Operand cast(TypedOperand operand, ir::Type type);
+  ir::Operand cast(const TypedOperand && operand, ir::Type type);
 
   inline Scope & get_scope() {
     return this->scopes.back();
@@ -56,8 +55,8 @@ private:
   inline ir::Func & get_func() {
     return std::get<ir::Func>(this->ir.back());
   }
-  inline ir::Block & get_block() {
-    return get_func().blocks.back();
+  inline ir::Label get_block() {
+    return --get_func().blocks.end();
   }
   const Symbol & get_symbol(const ast::Ident & ident);
   int eval_constexpr(const ast::Expr & expr);
