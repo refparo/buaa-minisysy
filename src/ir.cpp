@@ -15,17 +15,13 @@ constexpr bool has_result(const ir::Instr & instr) {
   }, instr);
 }
 
-void assign_vregs(ir::Program & program) {
-  for (auto & def : program) {
-    if (def.index() != 0) continue;
-    auto & func = std::get<ir::Func>(def);
-    int vreg = int(func.args.size());
-    for (auto & block : func.blocks) {
-      block.label = vreg++;
-      for (auto & instr : block.body) {
-        if (has_result(instr)) {
-          instr.vreg = vreg++;
-        }
+void assign_vregs(ir::Func & func) {
+  int vreg = int(func.args.size());
+  for (auto & block : func.blocks) {
+    block.label = vreg++;
+    for (auto & instr : block.body) {
+      if (has_result(instr)) {
+        instr.vreg = vreg++;
       }
     }
   }
@@ -193,7 +189,7 @@ std::ostream & operator<<(std::ostream & out, const ir::Operand & operand) {
     [&out](const ir::Const operand) {
       out << operand.value;
     },
-    [&out](const ir::Var operand) {
+    [&out](const ir::Result operand) {
       out << '%' << operand->vreg;
     },
     [&out](const ir::Arg operand) {

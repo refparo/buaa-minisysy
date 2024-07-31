@@ -19,10 +19,10 @@ using InstrRef = BlockBody::iterator;
 using Label = FuncBody::iterator;
 
 struct Const { int value; };
-using Var = InstrRef;
+using Result = InstrRef;
 struct Arg { int idx; };
 using Global = std::string;
-using Operand = std::variant<Const, Var, Arg, Global>;
+using Operand = std::variant<Const, Result, Arg, Global>;
 
 // instr
 
@@ -153,7 +153,16 @@ using Program = std::vector<GlobalDef>;
 
 }
 
-void assign_vregs(ir::Program & program);
+template<typename F>
+void foreach_func(ir::Program & program, F f) {
+  for (auto & def : program) {
+    if (auto func = std::get_if<ir::Func>(&def)) {
+      f(*func);
+    }
+  }
+}
+
+void assign_vregs(ir::Func & func);
 
 std::ostream & operator<<(std::ostream & out, const ir::Type & type);
 std::ostream & operator<<(std::ostream & out, const ir::Operand & operand);
