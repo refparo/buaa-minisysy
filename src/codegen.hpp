@@ -56,7 +56,7 @@ private:
     return std::get<ir::Func>(this->ir.back());
   }
   inline ir::Label get_block() {
-    return --get_func().blocks.end();
+    return &get_func().blocks.back();
   }
   const Symbol & get_symbol(const ast::Ident & ident);
   int eval_constexpr(const ast::Expr & expr);

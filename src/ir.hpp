@@ -16,7 +16,7 @@ using BlockBody = std::list<struct Instr>;
 using FuncBody = std::list<struct Block>;
 
 using InstrRef = BlockBody::iterator;
-using Label = FuncBody::iterator;
+using Label = Block*;
 
 struct Const { int value; };
 using Result = InstrRef;
@@ -131,7 +131,7 @@ struct Func {
   FuncBody blocks;
 
   inline Label new_block() {
-    return blocks.insert(blocks.end(), Block{});
+    return &*blocks.insert(blocks.end(), Block{});
   }
 };
 

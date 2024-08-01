@@ -15,8 +15,13 @@ add_library(base STATIC
 add_executable(a.out
   src/main.cpp
 )
-
 target_link_libraries(a.out PRIVATE base)
+
+add_executable(mem2reg
+  src/mem2reg_main.cpp
+  src/mem2reg.cpp
+)
+target_link_libraries(mem2reg PRIVATE base)
 
 add_executable(lexer.out
   labLexer/lexer.cpp
