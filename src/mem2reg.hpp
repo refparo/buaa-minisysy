@@ -1,3 +1,5 @@
+#pragma once
+
 #include <algorithm>
 #include <functional>
 #include <map>
@@ -49,6 +51,7 @@ AdjList<Block> dominator_sets(
     bool changed = false;
     for (auto block : order) {
       auto & dom = result[block];
+      bool unset = dom.empty();
       if (!dom.empty()) {
         dom.pop_back();
       }
@@ -57,9 +60,10 @@ AdjList<Block> dominator_sets(
         // if pred != {all blocks}
         if (auto it = result.find(pred); it != result.end()) {
           auto & dom_pred = it->second;
-          if (dom.empty()) {
+          if (unset) {
             // if dom == {all blocks}, dom <- dom_pred
             dom = dom_pred;
+            unset = false;
             changed = true;
           } else {
             // otherwise, dom <- dom ∩ dom_pred
@@ -88,4 +92,26 @@ AdjList<Block> dominator_sets(
   return result;
 }
 
-void mem2reg(ir::Func & func);
+template<typename Block>
+AdjList<Block> domination_frontiers(
+  const AdjList<Block> & inv_cfg,
+  const AdjList<Block> & dom
+) {
+  AdjList<Block> result;
+  for (auto & [block, preds] : inv_cfg) {
+    if (preds.size() > 1) {
+      for (auto pred : preds) {
+        for (
+          auto runner = pred;
+          runner != *++dom.at(block).rbegin();
+          runner = *++dom.at(runner).rbegin()
+        ) {
+          result[runner].push_back(block);
+        }
+      }
+    }
+  }
+  return result;
+}
+
+void mem2reg(ir::Func & func, const AdjList<ir::Label> & df);

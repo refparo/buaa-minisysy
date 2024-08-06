@@ -23,6 +23,12 @@ add_executable(mem2reg
 )
 target_link_libraries(mem2reg PRIVATE base)
 
+add_executable(domination_test
+  src/domination_test.cpp
+  src/mem2reg.cpp
+)
+target_link_libraries(domination_test PRIVATE base)
+
 add_executable(lexer.out
   labLexer/lexer.cpp
 )

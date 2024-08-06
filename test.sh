@@ -32,6 +32,28 @@ for in in tests/*.in; do
   fi
 done
 
+target=build/mem2reg
+echo testing $target:
+for in in tests/*.in; do
+  [[ $in == *.ll.in ]] && continue
+  echo test $in:
+  ll=${in%in}ll
+  if [ -f $ll ]; then
+    $target < $in > build/a.ll
+    llvm-link build/a.ll libsysy/libsysy.ll -S -o build/a.ll
+    llret=${in%in}ll.ret
+    if [ -f $llret ]; then
+      lli build/a.ll
+      [ $? -eq $(cat $llret) ] && echo ret ok || out_failed+=($in)
+    fi
+    llout=${in%in}ll.out
+    if [ -f $llout ]; then
+      diff -b <(lli build/a.ll < ${in%in}ll.in) <(< $llout) && echo out ok || out_failed+=($in)
+    fi
+    rm build/a.ll
+  fi
+done
+
 target=build/lexer.out
 echo testing $target:
 for in in labLexer/tests/*.in; do
